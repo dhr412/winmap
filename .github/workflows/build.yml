@@ -36,6 +36,7 @@ jobs:
             i686-w64-mingw32-gcc -Wall -O2 src/winmap.c -o "dist/$filename" -lkernel32
           elif [[ "$arch" == "x86_64" ]]; then
             x86_64-w64-mingw32-gcc -Wall -O2 src/winmap.c -o "dist/$filename" -lkernel32
+          fi
           
           echo "Build successful for $arch"
         shell: bash
