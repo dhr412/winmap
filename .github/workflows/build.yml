@@ -1,0 +1,86 @@
+name: Build binary
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version (e.g., v1.0.0)"
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [i686, x86_64, aarch64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install MinGW cross-compiler
+        run: |
+          sudo apt update
+          sudo apt install -y mingw-w64 gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+        shell: bash
+
+      - name: Build (${{ matrix.arch }})
+        run: |
+          set -e
+          mkdir -p dist
+          
+          arch="${{ matrix.arch }}"
+          filename="winmap-$arch.exe"
+          
+          echo "Building for $arch"
+          
+          if [[ "$arch" == "i686" ]]; then
+            i686-w64-mingw32-gcc -Wall -O2 src/winmap.c -o "dist/$filename" -lkernel32
+          elif [[ "$arch" == "x86_64" ]]; then
+            x86_64-w64-mingw32-gcc -Wall -O2 src/winmap.c -o "dist/$filename" -lkernel32
+          elif [[ "$arch" == "aarch64" ]]; then
+            aarch64-w64-mingw32-gcc -Wall -O2 src/winmap.c -o "dist/$filename" -lkernel32
+          fi
+          
+          echo "Build successful for $arch"
+        shell: bash
+
+      - name: Show built files
+        run: ls -R dist
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.arch }}
+          path: dist/*
+
+  merge-artifacts:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download i686 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-i686
+          path: combined-binaries
+
+      - name: Download x86_64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-x86_64
+          path: combined-binaries
+
+      - name: Download aarch64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-aarch64
+          path: combined-binaries
+
+      - name: List combined contents
+        run: ls -R combined-binaries
+        shell: bash
+
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ github.event.inputs.release_version }}
+          path: combined-binaries
