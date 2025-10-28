@@ -6,7 +6,7 @@
 
 ### From Releases
 
-1. Download the latest binary from the [Releases](https://github.com/dhr412/winmap/releases) page
+1. Download the latest binary for your architecture from the [Releases](https://github.com/dhr412/winmap/releases) page
 2. Extract `winmap.exe` to your desired location
 3. Optionally add the directory to your system PATH for easy access from any command line tool
 
@@ -22,7 +22,7 @@
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/winmap.git
+   git clone https://github.com/dhr412/winmap.git
    cd winmap
    ```
 
@@ -101,4 +101,3 @@ winmap.exe 12345 0x0d37ff6e0 char* "Hello"
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
