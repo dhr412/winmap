@@ -12,7 +12,31 @@ void segfault_handler(int sig) {
   exit(1);
 }
 
+void print_help(const char *prog_name) {
+  printf("Usage: %s <process_id> <hex_address> <type> <value>\n\n", prog_name);
+  printf("Arguments:\n");
+  printf("  process_id    Process ID (PID) of the target process\n");
+  printf("  hex_address   Memory address in hexadecimal (e.g., 0x0d37ff6e0)\n");
+  printf("  type          Data type: int, float, bool, or str\n");
+  printf("  value         Value to write (format depends on type)\n\n");
+  printf("Examples:\n");
+  printf("  %s 12345 0x0d37ff6e0 int 42\n", prog_name);
+  printf("  %s 12345 0x0d37ff6e0 float 3.14\n", prog_name);
+  printf("  %s 12345 0x0d37ff6e0 bool 1\n", prog_name);
+  printf("  %s 12345 0x0d37ff6e0 str hello\n\n", prog_name);
+  printf("Options:\n");
+  printf("  -h, --help    Show this help message\n");
+}
+
 int main(int argc, char *argv[]) {
+  if (argc == 2) {
+    if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0 ||
+        strcmp(argv[1], "-help") == 0) {
+      print_help(argv[0]);
+      return 0;
+    }
+  }
+
   if (argc != 5) {
     fprintf(stdout, "Usage: %s <process_id> <hex_address> <type> <value>\n",
             argv[0]);
