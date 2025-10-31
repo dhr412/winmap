@@ -2,6 +2,8 @@
 
 **WinMap** is a cross-process memory modification utility for Windows. It allows reading and writing memory in another process by specifying a process ID, memory address, data type, and value.
 
+> Warning: This tool can modify the memory of running processes. Incorrect usage can corrupt data, crash applications, or cause system instability. Only use this on processes you own or have explicit permission to modify. Use with caution and always test on non-critical processes first.
+
 ## Installation
 
 ### From Releases
@@ -97,6 +99,11 @@ winmap.exe 12345 0x0d37ff6e0 str "Hello"
 - **Process Must Be Running**: The target process must be active during the operation
 - **Confirmation Prompt**: If the memory address contains a non-zero value, winmap will prompt you to confirm before overwriting
 - **Error Handling**: The tool provides detailed error messages if operations fail, including Windows error codes
+- **Data Type Matters:** Memory doesn't have inherent types. Always use the same data type when reading and writing to the same address, or you may misinterpret the data
+
+## Disclaimer
+
+This tool is provided for educational and debugging purposes only. Users are responsible for any damage caused by its use. Modifying memory in system processes or third-party software may violate terms of service or cause legal issues. Use responsibly.
 
 ## License
 
