@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
   if (argc != 5) {
     fprintf(stdout, "Usage: %s <process_id> <hex_address> <type> <value>\n",
             argv[0]);
-    fprintf(stdout, "Types: int, float, bool, char*\n");
+    fprintf(stdout, "Types: int, float, bool, str\n");
     return 1;
   }
 
@@ -168,9 +168,9 @@ int main(int argc, char *argv[]) {
     printf("Successfully wrote %s to address %p\n", writeVal ? "true" : "false",
            addr);
 
-  } else if (strcmp(type, "char*") == 0) {
+  } else if (strcmp(type, "str") == 0) {
     if (val_str == NULL || strlen(val_str) == 0) {
-      fprintf(stderr, "Error: Invalid char* value (null or empty)\n");
+      fprintf(stderr, "Error: Invalid string value (null or empty)\n");
       CloseHandle(hProcess);
       return 1;
     }
@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (current != NULL) {
-      printf("Current value at %p: %p\n", addr, current);
+      printf("Current pointer at %p: %p\n", addr, current);
       printf("Press any key to confirm overwrite...");
       getchar();
     }
