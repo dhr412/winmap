@@ -67,6 +67,18 @@ tasklist /FI "IMAGENAME eq program.exe"
 
 Or use Task Manager (Ctrl+Shift+Esc) and enable the PID column.
 
+### Getting Help
+
+You can display the help message by using any of the following flags:
+
+```bash
+winmap.exe -h
+winmap.exe --help
+winmap.exe -help
+```
+
+This will show detailed usage information, examples, and all available options.
+
 ### Examples
 
 Write an integer value to a process:
