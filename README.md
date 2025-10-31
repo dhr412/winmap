@@ -1,6 +1,6 @@
 # WinMap
 
-**WinMap** is a cross-process memory modification utility for Windows. It allows you to read and write memory in another process by specifying a process ID, memory address, data type, and value.
+**WinMap** is a cross-process memory modification utility for Windows. It allows reading and writing memory in another process by specifying a process ID, memory address, data type, and value.
 
 ## Installation
 
@@ -52,7 +52,7 @@ winmap.exe <process_id> <hex_address> <type> <value>
 
 - **process_id**: The decimal process ID (PID) of the target process
 - **hex_address**: The memory address in hexadecimal format (e.g., `0x0d37ff6e0`)
-- **type**: Data type to write - `int`, `float`, `bool`, or `char*`
+- **type**: Data type to write - `int`, `float`, `bool`, or `str`
 - **value**: The value to write (format depends on type)
 
 ### Finding a Process ID
@@ -88,7 +88,7 @@ winmap.exe 12345 0x0d37ff6e0 bool 1
 Write a pointer value:
 
 ```bash
-winmap.exe 12345 0x0d37ff6e0 char* "Hello"
+winmap.exe 12345 0x0d37ff6e0 str "Hello"
 ```
 
 ### Important Notes
