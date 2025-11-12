@@ -12,6 +12,67 @@ void segfault_handler(int sig) {
   exit(1);
 }
 
+bool is_admin() {
+  BOOL is_admin = FALSE;
+  HANDLE token = NULL;
+
+  if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+    TOKEN_ELEVATION elevation;
+    DWORD size = sizeof(TOKEN_ELEVATION);
+
+    if (GetTokenInformation(token, TokenElevation, &elevation, size, &size)) {
+      is_admin = elevation.TokenIsElevated;
+    }
+    CloseHandle(token);
+  }
+
+  return is_admin;
+}
+
+bool enable_debug_privilege() {
+  HANDLE token = NULL;
+  TOKEN_PRIVILEGES privileges;
+
+  if (!OpenProcessToken(GetCurrentProcess(),
+                        TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token)) {
+    fprintf(stderr, "Warning: Could not open process token\n");
+    return false;
+  }
+
+  if (!LookupPrivilegeValue(NULL, SE_DEBUG_NAME,
+                            &privileges.Privileges[0].Luid)) {
+    fprintf(stderr, "Warning: Could not lookup debug privilege\n");
+    CloseHandle(token);
+    return false;
+  }
+
+  privileges.PrivilegeCount = 1;
+  privileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+  if (!AdjustTokenPrivileges(token, FALSE, &privileges, 0, NULL, NULL)) {
+    fprintf(stderr, "Warning: Could not enable debug privilege\n");
+    CloseHandle(token);
+    return false;
+  }
+
+  CloseHandle(token);
+  return true;
+}
+
+bool unprotect_memory(HANDLE hProcess, void *addr, SIZE_T size) {
+  DWORD old_protect;
+
+  if (!VirtualProtectEx(hProcess, addr, size, PAGE_EXECUTE_READWRITE,
+                        &old_protect)) {
+    fprintf(stderr, "Warning: Could not unprotect memory (error: %lu)\n",
+            GetLastError());
+    return false;
+  }
+
+  printf("Memory unprotected successfully\n");
+  return true;
+}
+
 void print_help(const char *prog_name) {
   printf("Usage: %s <process_id> <hex_address> <type> <value>\n\n", prog_name);
   printf("Arguments:\n");
@@ -37,10 +98,30 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (argc != 5) {
-    fprintf(stdout, "Usage: %s <process_id> <hex_address> <type> <value>\n",
+  bool require_admin = false;
+  int arg_offset = 1;
+
+  if (argc > 1 && strcmp(argv[1], "--admin") == 0) {
+    require_admin = true;
+    arg_offset = 2;
+  }
+
+  if (require_admin) {
+    if (!is_admin()) {
+      fprintf(stderr, "Error: Administrator privileges required. Please run as "
+                      "administrator.\n");
+      return 1;
+    }
+    enable_debug_privilege();
+    printf("Admin mode enabled\n");
+  }
+
+  if (argc != arg_offset + 4) {
+    fprintf(stdout,
+            "Usage: %s [--admin] <process_id> <hex_address> <type> <value>\n",
             argv[0]);
     fprintf(stdout, "Types: int, float, bool, str\n");
+    fprintf(stdout, "Try '%s -h' for more information.\n", argv[0]);
     return 1;
   }
 
@@ -48,9 +129,9 @@ int main(int argc, char *argv[]) {
 
   char *endptr;
   errno = 0;
-  unsigned long pid = strtoul(argv[1], &endptr, 10);
-  if (endptr == argv[1] || *endptr != '\0' || errno == ERANGE) {
-    fprintf(stderr, "Error: Invalid process ID '%s'\n", argv[1]);
+  unsigned long pid = strtoul(argv[arg_offset], &endptr, 10);
+  if (endptr == argv[arg_offset] || *endptr != '\0' || errno == ERANGE) {
+    fprintf(stderr, "Error: Invalid process ID '%s'\n", argv[arg_offset]);
     return 1;
   }
 
@@ -64,10 +145,10 @@ int main(int argc, char *argv[]) {
   }
 
   errno = 0;
-  unsigned long long ull = strtoull(argv[2], &endptr, 16);
-  if (endptr == argv[2] || *endptr != '\0' ||
+  unsigned long long ull = strtoull(argv[arg_offset + 1], &endptr, 16);
+  if (endptr == argv[arg_offset + 1] || *endptr != '\0' ||
       (ull == ULLONG_MAX && errno == ERANGE)) {
-    fprintf(stderr, "Error: Invalid hex address '%s'\n", argv[2]);
+    fprintf(stderr, "Error: Invalid hex address '%s'\n", argv[arg_offset + 1]);
     CloseHandle(hProcess);
     return 1;
   }
@@ -79,8 +160,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  char *type = argv[3];
-  char *val_str = argv[4];
+  char *type = argv[arg_offset + 2];
+  char *val_str = argv[arg_offset + 3];
   SIZE_T bytesRead, bytesWritten;
 
   if (strcmp(type, "int") == 0) {
@@ -109,6 +190,7 @@ int main(int argc, char *argv[]) {
     }
 
     int writeVal = (int)val;
+    unprotect_memory(hProcess, addr, sizeof(int));
     if (!WriteProcessMemory(hProcess, addr, &writeVal, sizeof(int),
                             &bytesWritten)) {
       fprintf(stderr, "Error: Could not write memory at %p (error: %lu)\n",
@@ -145,6 +227,7 @@ int main(int argc, char *argv[]) {
     }
 
     float writeVal = (float)dval;
+    unprotect_memory(hProcess, addr, sizeof(float));
     if (!WriteProcessMemory(hProcess, addr, &writeVal, sizeof(float),
                             &bytesWritten)) {
       fprintf(stderr, "Error: Could not write memory at %p (error: %lu)\n",
@@ -181,6 +264,7 @@ int main(int argc, char *argv[]) {
     }
 
     bool writeVal = val != 0;
+    unprotect_memory(hProcess, addr, sizeof(bool));
     if (!WriteProcessMemory(hProcess, addr, &writeVal, sizeof(bool),
                             &bytesWritten)) {
       fprintf(stderr, "Error: Could not write memory at %p (error: %lu)\n",
@@ -215,6 +299,7 @@ int main(int argc, char *argv[]) {
     }
 
     char *writeVal = val_str;
+    unprotect_memory(hProcess, addr, sizeof(char *));
     if (!WriteProcessMemory(hProcess, addr, &writeVal, sizeof(char *),
                             &bytesWritten)) {
       fprintf(stderr, "Error: Could not write memory at %p (error: %lu)\n",
