@@ -73,21 +73,99 @@ bool unprotect_memory(HANDLE hProcess, void *addr, SIZE_T size) {
   return true;
 }
 
+void search_memory(HANDLE hProcess, const char *type, const char *val_str) {
+  SYSTEM_INFO sysInfo;
+  GetSystemInfo(&sysInfo);
+
+  LPVOID minAddr = sysInfo.lpMinimumApplicationAddress;
+  LPVOID maxAddr = sysInfo.lpMaximumApplicationAddress;
+
+  MEMORY_BASIC_INFORMATION mbi;
+  LPVOID currentAddr = minAddr;
+
+  printf("Searching for %s value: %s\n", type, val_str);
+
+  void *searchPattern = NULL;
+  size_t patternSize = 0;
+  size_t alignment = 1;
+  int intVal;
+  float floatVal;
+  bool boolVal;
+
+  if (strcmp(type, "int") == 0) {
+    char *end;
+    long val = strtol(val_str, &end, 10);
+    intVal = (int)val;
+    searchPattern = &intVal;
+    patternSize = sizeof(int);
+    alignment = sizeof(int);
+  } else if (strcmp(type, "float") == 0) {
+    floatVal = strtof(val_str, NULL);
+    searchPattern = &floatVal;
+    patternSize = sizeof(float);
+    alignment = sizeof(float);
+  } else if (strcmp(type, "bool") == 0) {
+    long val = strtol(val_str, NULL, 10);
+    boolVal = (val != 0);
+    searchPattern = &boolVal;
+    patternSize = sizeof(bool);
+    alignment = sizeof(bool);
+  } else if (strcmp(type, "str") == 0) {
+    searchPattern = (void *)val_str;
+    patternSize = strlen(val_str);
+    alignment = 1;
+  } else {
+    fprintf(stderr, "Error: Invalid type '%s'\n", type);
+    return;
+  }
+
+  while (currentAddr < maxAddr) {
+    if (VirtualQueryEx(hProcess, currentAddr, &mbi, sizeof(mbi)) == 0) {
+      break;
+    }
+
+    if (mbi.State == MEM_COMMIT && mbi.Protect == PAGE_READWRITE) {
+
+      BYTE *buffer = (BYTE *)malloc(mbi.RegionSize);
+      SIZE_T bytesRead;
+
+      if (buffer) {
+        if (ReadProcessMemory(hProcess, currentAddr, buffer, mbi.RegionSize,
+                              &bytesRead)) {
+          if (bytesRead >= patternSize) {
+            for (SIZE_T i = 0; i <= bytesRead - patternSize; i += alignment) {
+              if (memcmp(buffer + i, searchPattern, patternSize) == 0) {
+                printf("Found at: 0x%p\n", (BYTE *)currentAddr + i);
+              }
+            }
+          }
+        }
+        free(buffer);
+      }
+    }
+    currentAddr = (LPVOID)((BYTE *)mbi.BaseAddress + mbi.RegionSize);
+  }
+}
+
 void print_help(const char *prog_name) {
-  printf("Usage: %s <process_id> <hex_address> <type> <value>\n\n", prog_name);
+  printf("Usage:\n");
+  printf("  Write:  %s write <process_id> <hex_address> <type> <value>\n",
+         prog_name);
+  printf("  Search: %s search <process_id> <type> <value>\n\n", prog_name);
   printf("Arguments:\n");
   printf("  process_id    Process ID (PID) of the target process\n");
   printf("  hex_address   Memory address in hexadecimal (e.g., 0x0d37ff6e0)\n");
   printf("  type          Data type: int, float, bool, or str\n");
-  printf("  value         Value to write (format depends on type)\n\n");
+  printf("  value         Value to search for or write\n\n");
   printf("Examples:\n");
   printf("  %s 12345 0x0d37ff6e0 int 42\n", prog_name);
-  printf("  %s 12345 0x0d37ff6e0 float 3.14\n", prog_name);
-  printf("  %s 12345 0x0d37ff6e0 bool 1\n", prog_name);
-  printf("  %s 12345 0x0d37ff6e0 str hello\n\n", prog_name);
+  printf("  %s search 12345 int 42\n", prog_name);
+  printf("  %s search 12345 str \"hello world\"\n\n", prog_name);
   printf("Options:\n");
   printf("  -h, --help    Show this help message\n");
 }
+
+typedef enum { MODE_WRITE, MODE_SEARCH } Mode;
 
 int main(int argc, char *argv[]) {
   if (argc == 2) {
@@ -116,11 +194,27 @@ int main(int argc, char *argv[]) {
     printf("Admin mode enabled\n");
   }
 
-  if (argc != arg_offset + 4) {
-    fprintf(stdout,
-            "Usage: %s [--admin] <process_id> <hex_address> <type> <value>\n",
-            argv[0]);
-    fprintf(stdout, "Types: int, float, bool, str\n");
+  Mode mode = MODE_WRITE;
+
+  if (argc > arg_offset) {
+    const char *cmd = argv[arg_offset];
+
+    if (strcmp(cmd, "search") == 0 || strcmp(cmd, "s") == 0) {
+      mode = MODE_SEARCH;
+      arg_offset++;
+    } else if (strcmp(cmd, "write") == 0 || strcmp(cmd, "w") == 0) {
+      mode = MODE_WRITE;
+      arg_offset++;
+    }
+  }
+
+  int required_args = (mode == MODE_SEARCH) ? 3 : 4;
+  if (argc != arg_offset + required_args) {
+    fprintf(
+        stdout,
+        "Usage: %s [--admin] <write|search> <process_id> [hex_address] <type> "
+        "<value>\n",
+        argv[0]);
     fprintf(stdout, "Try '%s -h' for more information.\n", argv[0]);
     return 1;
   }
@@ -136,12 +230,21 @@ int main(int argc, char *argv[]) {
   }
 
   HANDLE hProcess =
-      OpenProcess(PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
+      OpenProcess(PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION |
+                      PROCESS_QUERY_INFORMATION,
                   FALSE, (DWORD)pid);
   if (hProcess == NULL) {
     fprintf(stderr, "Error: Could not open process %lu (error: %lu)\n", pid,
             GetLastError());
     return 1;
+  }
+
+  if (mode == MODE_SEARCH) {
+    char *type = argv[arg_offset + 1];
+    char *val_str = argv[arg_offset + 2];
+    search_memory(hProcess, type, val_str);
+    CloseHandle(hProcess);
+    return 0;
   }
 
   errno = 0;
