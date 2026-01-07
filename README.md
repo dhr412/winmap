@@ -1,6 +1,6 @@
 # WinMap
 
-**WinMap** is a cross-process memory modification utility for Windows. It allows reading and writing memory in another process by specifying a process ID, memory address, data type, and value.
+**WinMap** is a cross-process memory modification utility for Windows. It allows searching, reading, and writing memory in another process.
 
 > ⚠️ **Warning**: This tool can modify the memory of running processes. Incorrect usage can corrupt data, crash applications, or cause system instability. Only use this on processes you own or have explicit permission to modify. Use with caution and always test on non-critical processes first.
 
@@ -46,16 +46,33 @@
 
 ## Usage
 
+```bash
+winmap.exe [--admin] [write|search] <args>
 ```
-winmap.exe [--admin] <process_id> <hex_address> <type> <value>
+
+### Modes
+
+- **write** (default): Write a value to a specific memory address.
+- **search**: Search for a value in the process memory.
+
+#### Write Mode
+
+```bash
+winmap.exe [--admin] [write] <process_id> <hex_address> <type> <value>
+```
+
+#### Search Mode
+
+```bash
+winmap.exe [--admin] search <process_id> <type> <value>
 ```
 
 ### Parameters
 
 - **process_id**: The decimal process ID (PID) of the target process
-- **hex_address**: The memory address in hexadecimal format (e.g., `0x0d37ff6e0`)
-- **type**: Data type to write - `int`, `float`, `bool`, or `str`
-- **value**: The value to write (format depends on type)
+- **hex_address**: The memory address in hexadecimal format (e.g., `0x0d37ff6e0`) - *Write mode only*
+- **type**: Data type - `int`, `float`, `bool`, or `str`
+- **value**: The value to search for or write
 
 ### Options
 
@@ -86,6 +103,18 @@ winmap.exe -help
 This will show detailed usage information, examples, and all available options.
 
 ### Examples
+
+Search for an integer value:
+
+```bash
+winmap.exe search 12345 int 42
+```
+
+Search for a string:
+
+```bash
+winmap.exe search 12345 str "Game Over"
+```
 
 Write an integer value to a process:
 
